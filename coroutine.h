@@ -88,9 +88,9 @@ static int g_first_free      = 0;
     void coroutine_stack_deallocate(void* ptr, size_t size) {
         free(ptr)
     }
+#elif defined(coroutine_stack_allocate) && defined(coroutine_stack_deallocate)
 #else
-    #define coroutine_stack_allocate(size) (assert(size), NULL)
-    #define coroutine_stack_deallocate(...)
+    #error "Must define an allocator/deallocator"
 #endif
 
 

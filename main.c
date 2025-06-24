@@ -88,7 +88,7 @@ void handle_client(TcpContext* ctx) {
             break;
         }
 
-        String index = load_html_file("resources/index.html");
+        String index = load_html_file("../resources/index.html");
         if (index.data == NULL) {
             printf("[%d]: Error loading index.html\n", id);
             return;
@@ -121,7 +121,7 @@ int main()
 {
     const char* error = NULL;
 
-    TcpServer server = tcp_server( .port=6969 );
+    TcpServer server = tcp_server(NULL, 6969, 0);
     if ((error = tcp_server_error(server))) {
         fprintf(stderr, "%s\n", error);
         return EXIT_FAILURE;
@@ -132,21 +132,21 @@ int main()
     printf("Serving at %s:%d\n", ip_str, server.port);
 
     while (true) {
-        printf("[%d]: Waiting for client connection...\n", server.fd);
+        printf("[000]: Waiting for client connection...\n");
         TcpClient client = tcp_accept(&server, handle_client);
         if ((error = tcp_client_error(client))) {
             fprintf(stderr, "%s\n", error);
         } else {
-            printf("[%d]: Client %d connected!\n", server.fd, client.fd);
+            printf("[000]: Client %d connected!\n", client.fd);
 
             char client_address[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &(client.host), client_address, INET_ADDRSTRLEN);
 
-            printf("[%d]: Client %d connected at %s:%d.\n", server.fd, client.fd, client_address, client.port);
+            printf("[000]: Client %d connected at %s:%d.\n", client.fd, client_address, client.port);
         }
 
         if (tcp_shutdown_requested()) {
-            printf("[%d]: Shutting down the server!\n", server.fd);
+            printf("[000]: Shutting down the server!\n");
             tcp_close(&server);
             return EXIT_SUCCESS;
         }

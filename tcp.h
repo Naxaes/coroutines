@@ -16,7 +16,6 @@ typedef struct TcpServer {
     uint32_t host;
     uint16_t port;
     uint16_t backlog;
-    void*    (*allocate)(size_t);
 } TcpServer;
 
 typedef struct TcpClient {
@@ -25,14 +24,6 @@ typedef struct TcpClient {
     uint16_t port;
 } TcpClient;
 
-typedef struct TcpServerOption {
-    int         _;
-    const char* host;
-    uint16_t    port;
-    uint16_t    backlog;
-    void*       (*allocate)(size_t);
-    void        (*deallocate)(void*, size_t);
-} TcpServerOption;
 
 typedef struct TcpContext {
     TcpClient client;
@@ -40,8 +31,7 @@ typedef struct TcpContext {
 } TcpContext;
 
 
-#define   tcp_server(...) tcp_server_with_options((TcpServerOption){ 0, __VA_ARGS__ })
-TcpServer tcp_server_with_options(TcpServerOption options);
+TcpServer tcp_server(const char* host, uint16_t port, uint16_t backlog);
 TcpClient tcp_accept(TcpServer* server, void (*serve)(TcpContext*));
 ssize_t   tcp_read(TcpClient* client, char* buffer, size_t bytes);
 ssize_t   tcp_write(TcpClient* client, char* buffer, size_t bytes);
@@ -68,19 +58,6 @@ const char* tcp_client_error(TcpClient client);
 #include <sys/fcntl.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-#include <fcntl.h>
-
-
-#if !defined(tcp__allocate) || !defined(tcp__deallocate)
-#include <stdlib.h>
-void* tcp__allocate(size_t size) {
-    return malloc(size);
-}
-void tcp__deallocate(void* ptr, size_t size) {
-    (void)size;
-    free(ptr);
-}
-#endif
 
 
 void tcp__on_client_disconnected(void* stack, size_t size) {
@@ -98,13 +75,13 @@ void tcp__on_client_disconnected(void* stack, size_t size) {
     close(client->fd);
 }
 
-TcpServer tcp_server_with_options(TcpServerOption options) {
+TcpServer tcp_server(const char* host, uint16_t port, uint16_t backlog) {
     int status;
 
     struct sockaddr_in server_address;
     server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(options.port);
-    server_address.sin_addr.s_addr = options.host ? inet_addr(options.host) : INADDR_ANY;
+    server_address.sin_port = htons(port);
+    server_address.sin_addr.s_addr = host ? inet_addr(host) : INADDR_ANY;
 
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) goto error;
@@ -120,18 +97,18 @@ TcpServer tcp_server_with_options(TcpServerOption options) {
     status = getsockname(server_fd, (struct sockaddr *)&server_address, &server_address_size);
     if (status < 0) goto error;
 
-    status = listen(server_fd, options.backlog);
+    status = listen(server_fd, backlog);
     if (status < 0) goto error;
 
     status = fcntl(server_fd, F_SETFL, fcntl(server_fd, F_GETFL, 0) | O_NONBLOCK);
     if (status < 0) goto error;
 
-    return (TcpServer) { server_fd, server_address.sin_addr.s_addr, ntohs(server_address.sin_port), options.backlog, tcp__allocate };
+    return (TcpServer) { server_fd, server_address.sin_addr.s_addr, ntohs(server_address.sin_port), backlog };
 
 error:
     status = errno;
     if (server_fd > 0) close(server_fd);
-    return (TcpServer){ -status, server_address.sin_addr.s_addr, ntohs(server_address.sin_port), options.backlog, tcp__allocate };
+    return (TcpServer){ -status, server_address.sin_addr.s_addr, ntohs(server_address.sin_port), backlog };
 }
 
 
