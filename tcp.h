@@ -16,7 +16,11 @@ typedef struct TcpServer {
     uint32_t host;
     uint16_t port;
     uint16_t backlog;
+
+    int next_thread;
+    int thread_fds[3];
 } TcpServer;
+
 
 typedef struct TcpClient {
     int fd;
@@ -28,6 +32,7 @@ typedef struct TcpClient {
 typedef struct TcpContext {
     TcpClient client;
     TcpServer server;
+    void (*serve)(struct TcpContext*);
 } TcpContext;
 
 
@@ -51,6 +56,8 @@ const char* tcp_client_error(TcpClient client);
 
 #ifdef TCP_IMPLEMENTATION
 
+#include <pthread.h>
+
 #define COROUTINE_MMAP
 #define COROUTINE_IMPLEMENTATION
 #include "coroutine.h"
@@ -70,9 +77,26 @@ void tcp__on_client_disconnected(void* stack, size_t size) {
     char client_address[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &(client->host), client_address, INET_ADDRSTRLEN);
 
-    printf("[%d]: Client %d (%s:%d) closed.\n", server->fd, coroutine_id(), client_address, client->port);
+    printf("[%03d]: Client %d (%s:%d) closed.\n", server->fd, coroutine_id(), client_address, client->port);
 
     close(client->fd);
+}
+
+void* worker_function(void* arg) {
+    int fd = (int)(ssize_t)arg;
+
+    TcpContext context = { 0 };
+    while (true) {
+        coroutine_wait_read(fd);
+        ssize_t bytes_read = read(fd, &context, sizeof(context));
+        printf("Read completed. Read %ld bytes\n", bytes_read);
+        if (bytes_read != sizeof(context)) {
+            fprintf(stderr, "Something went wrong while reading from client.\n");
+            abort();
+        }
+
+        coroutine_create((void*) context.serve, &context, sizeof(context), tcp__on_client_disconnected);
+    }
 }
 
 TcpServer tcp_server(const char* host, uint16_t port, uint16_t backlog) {
@@ -103,7 +127,33 @@ TcpServer tcp_server(const char* host, uint16_t port, uint16_t backlog) {
     status = fcntl(server_fd, F_SETFL, fcntl(server_fd, F_GETFL, 0) | O_NONBLOCK);
     if (status < 0) goto error;
 
-    return (TcpServer) { server_fd, server_address.sin_addr.s_addr, ntohs(server_address.sin_port), backlog };
+    int read_fds[3] = { 0 };
+    int write_fds[3] = { 0 };
+    for (int i = 0; i < 3; ++i) {
+        int pipe_fd[2];
+        pipe(pipe_fd);
+
+        int read_fd  = pipe_fd[0];
+        int write_fd = pipe_fd[1];
+
+        read_fds[i]  = read_fd;
+        write_fds[i] = write_fd;
+
+        pthread_t thread;
+        pthread_create(&thread, NULL, worker_function, (void *)(ssize_t)read_fd);
+
+        pthread_detach(thread);
+    }
+
+    TcpServer result = {
+        server_fd,
+        server_address.sin_addr.s_addr,
+        ntohs(server_address.sin_port),
+        backlog,
+        0
+    };
+    memcpy(result.thread_fds, write_fds, sizeof(write_fds));
+    return result;
 
 error:
     status = errno;
@@ -127,9 +177,12 @@ TcpClient tcp_accept(TcpServer* server, void (*serve)(TcpContext*)) {
     if (status < 0) goto error;
 
     TcpClient client = { .fd = client_fd, .host = client_address.sin_addr.s_addr, .port = ntohs(client_address.sin_port) };
+    TcpContext context = { client, *server, serve };
 
-    TcpContext context = { client, *server };
-    coroutine_create((void*) serve, &context, sizeof(context), tcp__on_client_disconnected);
+    int thread_fd = server->thread_fds[server->next_thread];
+    server->next_thread = (server->next_thread + 1) % 3;
+
+    write(thread_fd, &context, sizeof(context));
 
     return client;
 
@@ -176,8 +229,8 @@ const char* tcp_server_error(TcpServer server) {
 const char* tcp_client_error(TcpClient client) {
     if (client.fd < 0) {
         int err = -client.fd;
-        if (err == EAGAIN)
-            return NULL;
+        // if (err == EAGAIN)
+            // return NULL;
         return strerror(err);
     }
     return NULL;

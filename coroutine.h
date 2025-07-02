@@ -46,10 +46,10 @@ void coroutine_wake_up(int id);
 #define MAX_CONCURRENT_COROUTINES 1024
 
 
-static struct pollfd  g_polls[MAX_CONCURRENT_COROUTINES]      = { 0 };
-static int            g_sleeping[MAX_CONCURRENT_COROUTINES]   = { 0 };
-static int            g_active[MAX_CONCURRENT_COROUTINES]     = { 0 };
-static Coroutine      g_coroutines[MAX_CONCURRENT_COROUTINES] = { 0 };
+_Thread_local struct pollfd  g_polls[MAX_CONCURRENT_COROUTINES]      = { 0 };
+_Thread_local int            g_sleeping[MAX_CONCURRENT_COROUTINES]   = { 0 };
+_Thread_local int            g_active[MAX_CONCURRENT_COROUTINES]     = { 0 };
+_Thread_local Coroutine      g_coroutines[MAX_CONCURRENT_COROUTINES] = { 0 };
 
 /*
 g_polls       Ordered parallel to g_sleeping
@@ -58,12 +58,11 @@ g_active      Unordered with indices to g_coroutines
 g_coroutines  Ordered in insertion order (with intrusive free-list?)
 */
 
-
-static int g_sleep_count     = 0;
-static int g_active_count    = 1;
-static int g_coroutine_count = 1;
-static int g_current_active  = 0;
-static int g_first_free      = 0;
+_Thread_local int g_sleep_count     = 0;
+_Thread_local int g_active_count    = 1;
+_Thread_local int g_coroutine_count = 1;
+_Thread_local int g_current_active  = 0;
+_Thread_local int g_first_free      = 0;
 
 
 #if defined(COROUTINE_MMAP)
@@ -94,38 +93,38 @@ static int g_first_free      = 0;
 #endif
 
 
-static int safety_check() {
-    printf("----------------\n");
+static int safety_check(bool print) {
+    if (print) printf("----------------\n");
 
     for (int i = 0; i < g_active_count - 1; i++) {
         for (int j = i + 1; j < g_active_count; j++) {
             if (g_active[i] == g_active[j]) {
-                printf("%d (%d) and %d (%d) in active!\n", i, g_active[i], j, g_active[j]);
+                if (print) printf("%d (%d) and %d (%d) in active!\n", i, g_active[i], j, g_active[j]);
                 return 0;
             }
         }
     }
 
     for (int i = 0; i < g_active_count; i++)
-        printf("%03d is active\n", g_active[i]);
+        if (print) printf("[%03d]: is active\n", g_active[i]);
 
 
     for (int i = 0; i < g_sleep_count - 1; i++) {
         for (int j = i + 1; j < g_sleep_count; j++) {
             if (g_sleeping[i] == g_sleeping[j]) {
-                printf("%d (%d) and %d (%d) in sleeping!\n", i, g_active[i], j, g_active[j]);
+                if (print) printf("%d (%d) and %d (%d) in sleeping!\n", i, g_active[i], j, g_active[j]);
                 return 0;
             }
         }
     }
 
     for (int i = 0; i < g_sleep_count; i++)
-        printf("%03d is sleeping\n", g_sleeping[i]);
+        if (print) printf("[%03d]: is sleeping\n", g_sleeping[i]);
 
     for (int i = 1; i < g_coroutine_count - 1; i++) {
         Coroutine* coroutine = &g_coroutines[i];
         if (coroutine->stack_base == NULL) {
-            printf("Null base at %d which is not main\n", i);
+            if (print) printf("Null base at %d which is not main\n", i);
             return 0;
         }
     }
@@ -137,7 +136,7 @@ static int safety_check() {
 void coroutine__return_from_current_coroutine();
 int coroutine_create(void (*f)(void*), void* data, size_t size, void (*destroy)(void*, size_t))
 {
-    assert(safety_check());
+    assert(safety_check(false));
 
     if (g_first_free != 0) {
         int free_index = g_first_free;
@@ -164,7 +163,7 @@ int coroutine_create(void (*f)(void*), void* data, size_t size, void (*destroy)(
 
         free->stack_ptr = ptr;
 
-        assert(safety_check());
+        assert(safety_check(true));
         return free_index;
     } else if (g_coroutine_count >= MAX_CONCURRENT_COROUTINES) {
         return -1;
@@ -200,7 +199,7 @@ int coroutine_create(void (*f)(void*), void* data, size_t size, void (*destroy)(
     g_active[g_active_count++] = g_coroutine_count;
     g_coroutines[g_coroutine_count++] = coroutine;
 
-    assert(safety_check());
+    assert(safety_check(true));
     return g_coroutine_count-1;
 }
 
@@ -242,7 +241,7 @@ void __attribute__((naked)) coroutine__restore_context(__attribute__((unused)) v
 
 
 void coroutine__poll() {
-    assert(safety_check());
+    assert(safety_check(false));
     if (g_sleep_count == 0) return;
 
     int timeout = g_active_count == 0 ? -1 : 0;
@@ -260,13 +259,13 @@ void coroutine__poll() {
             i += 1;
         }
     }
-    assert(safety_check());
+    assert(safety_check(true));
 }
 
 extern void coroutine__switch_context(int fd, CoroutineMode mode, void *rsp) asm("coroutine__switch_context");
 void coroutine__switch_context(int fd, CoroutineMode mode, void *rsp)
 {
-    assert(safety_check());
+    assert(safety_check(false));
 
     // Set current context rsp
     int active_id = g_active[g_current_active];
@@ -330,7 +329,7 @@ void coroutine__return_from_current_coroutine()
     void* rsp = next_coroutine->stack_ptr;
 
     assert(rsp != NULL);
-    assert(safety_check());
+    assert(safety_check(true));
     coroutine__restore_context(rsp);
 }
 

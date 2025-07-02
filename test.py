@@ -36,11 +36,7 @@ def stress_test(host, port, num_clients):
         thread.join()
 
 
-host = '127.0.0.1'
-port = 6969
-num_clients = 1000
-
-stress_test(host, port, num_clients)
+stress_test(host = '127.0.0.1', port = 6969, num_clients = 1000)
 
 
 
