@@ -1,4 +1,4 @@
-# Coroutine Library for C
+# Coroutine Library for C [![CI](https://github.com/Naxaes/coroutines/actions/workflows/test.yml/badge.svg)](https://github.com/Naxaes/coroutines/actions/workflows/test.yml)
 
 A high-performance, portable, stackful coroutine library for C, supporting `x86_64` and `AArch64`. 
 
