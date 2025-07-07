@@ -54,7 +54,7 @@ jobs:
 
       - name: Run test
         run: |
-          ./test &
+          ./build/test &
           MAIN_PID=$!
           sleep 1
           python3 test.py || { kill $MAIN_PID; exit 1; }
