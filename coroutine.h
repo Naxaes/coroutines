@@ -159,15 +159,50 @@ int coroutine_create(void (*f)(void*), const void* data, size_t size, void (*des
 
         void** ptr = (void*) ptr_top;
 
-        *(--ptr) = (void*) coroutine__return_from_current_coroutine;
-        *(--ptr) = (void*) f;
-        *(--ptr) = (void*) ptr_top;         // push rdi
-        *(--ptr) = 0;                       // push rbx
-        *(--ptr) = 0;                       // push rbp
-        *(--ptr) = 0;                       // push r12
-        *(--ptr) = 0;                       // push r13
-        *(--ptr) = 0;                       // push r14
-        *(--ptr) = 0;                       // push r15
+        #if defined(__x86_64__)
+                *(--ptr) = (void*) coroutine__return_from_current_coroutine;
+                *(--ptr) = (void*) f;
+                *(--ptr) = (void*) ptr_top;         // push rdi
+                *(--ptr) = 0;                       // push rbx
+                *(--ptr) = 0;                       // push rbp
+                *(--ptr) = 0;                       // push r12
+                *(--ptr) = 0;                       // push r13
+                *(--ptr) = 0;                       // push r14
+                *(--ptr) = 0;                       // push r15
+        #elif defined(__aarch64__)
+                *(--ptr) = (void*) ptr_top;
+                *(--ptr) = (void*) coroutine__return_from_current_coroutine;
+                *(--ptr) = (void*) f; // push x30
+                *(--ptr) = 0;   // push x29
+                *(--ptr) = 0;   // push x28
+                *(--ptr) = 0;   // push x27
+                *(--ptr) = 0;   // push x26
+                *(--ptr) = 0;   // push x25
+                *(--ptr) = 0;   // push x24
+                *(--ptr) = 0;   // push x23
+                *(--ptr) = 0;   // push x22
+                *(--ptr) = 0;   // push x21
+                *(--ptr) = 0;   // push x20
+                *(--ptr) = 0;   // push x19
+                *(--ptr) = 0;   // push v15
+                *(--ptr) = 0;
+                *(--ptr) = 0;   // push v14
+                *(--ptr) = 0;
+                *(--ptr) = 0;   // push v13
+                *(--ptr) = 0;
+                *(--ptr) = 0;   // push v12
+                *(--ptr) = 0;
+                *(--ptr) = 0;   // push v11
+                *(--ptr) = 0;
+                *(--ptr) = 0;   // push v10
+                *(--ptr) = 0;
+                *(--ptr) = 0;   // push v09
+                *(--ptr) = 0;
+                *(--ptr) = 0;   // push v08
+                *(--ptr) = 0;
+        #else
+        #error "Unsupported platform"
+        #endif
 
         free->stack_ptr = ptr;
 
@@ -187,15 +222,51 @@ int coroutine_create(void (*f)(void*), const void* data, size_t size, void (*des
 
     void** ptr = (void*) ptr_top;
 
-    *(--ptr) = (void*) coroutine__return_from_current_coroutine;
-    *(--ptr) = (void*) f;
-    *(--ptr) = (void*) ptr_top;         // push rdi
-    *(--ptr) = 0;                       // push rbx
-    *(--ptr) = 0;                       // push rbp
-    *(--ptr) = 0;                       // push r12
-    *(--ptr) = 0;                       // push r13
-    *(--ptr) = 0;                       // push r14
-    *(--ptr) = 0;                       // push r15
+    #if defined(__x86_64__)
+        *(--ptr) = (void*) coroutine__return_from_current_coroutine;
+        *(--ptr) = (void*) f;
+        *(--ptr) = (void*) ptr_top;         // push rdi
+        *(--ptr) = 0;                       // push rbx
+        *(--ptr) = 0;                       // push rbp
+        *(--ptr) = 0;                       // push r12
+        *(--ptr) = 0;                       // push r13
+        *(--ptr) = 0;                       // push r14
+        *(--ptr) = 0;                       // push r15
+    #elif defined(__aarch64__)
+        *(--ptr) = (void*) ptr_top;
+        *(--ptr) = (void*) coroutine__return_from_current_coroutine;
+        *(--ptr) = (void*) f; // push x30
+        *(--ptr) = 0;   // push x29
+        *(--ptr) = 0;   // push x28
+        *(--ptr) = 0;   // push x27
+        *(--ptr) = 0;   // push x26
+        *(--ptr) = 0;   // push x25
+        *(--ptr) = 0;   // push x24
+        *(--ptr) = 0;   // push x23
+        *(--ptr) = 0;   // push x22
+        *(--ptr) = 0;   // push x21
+        *(--ptr) = 0;   // push x20
+        *(--ptr) = 0;   // push x19
+        *(--ptr) = 0;   // push v15
+        *(--ptr) = 0;
+        *(--ptr) = 0;   // push v14
+        *(--ptr) = 0;
+        *(--ptr) = 0;   // push v13
+        *(--ptr) = 0;
+        *(--ptr) = 0;   // push v12
+        *(--ptr) = 0;
+        *(--ptr) = 0;   // push v11
+        *(--ptr) = 0;
+        *(--ptr) = 0;   // push v10
+        *(--ptr) = 0;
+        *(--ptr) = 0;   // push v09
+        *(--ptr) = 0;
+        *(--ptr) = 0;   // push v08
+        *(--ptr) = 0;
+    #else
+    #error "Unsupported platform! Only supports x86_64 or Aarch64.
+    #endif
+
 
     Coroutine coroutine = {
         .stack_base = stack,
@@ -230,39 +301,80 @@ void coroutine_destroy_all(void) {
 }
 
 
-// Linux x86_64 call convention
+#if defined(__x86_64__)
 // rdi, rsi, rdx, rcx, r8, and r9 are arguments
 // r12, r13, r14, r15, rbx, rsp, rbp are the callee-saved registers
+#define STORE_REGISTERS                             \
+    "    pushq %rdi\n"                              \
+    "    pushq %rbp\n"                              \
+    "    pushq %rbx\n"                              \
+    "    pushq %r12\n"                              \
+    "    pushq %r13\n"                              \
+    "    pushq %r14\n"                              \
+    "    pushq %r15\n"                              \
+    "    movq %rsp, %rdx\n"                         \
+    "    jmp coroutine__switch_context\n"
+#define RESTORE_REGISTERS                           \
+    "    movq %rdi, %rsp\n"                         \
+    "    popq %r15\n"                               \
+    "    popq %r14\n"                               \
+    "    popq %r13\n"                               \
+    "    popq %r12\n"                               \
+    "    popq %rbx\n"                               \
+    "    popq %rbp\n"                               \
+    "    popq %rdi\n"                               \
+    "    ret\n"
+#elif defined(__aarch64__)
+// x19 to x28 are callee-saved
+// x0 to x7 are arguments/return values
+#define STORE_REGISTERS                                                         \
+    "sub sp,   sp, #240\n"                                                      \
+    "stp q8,   q9, [sp, #0]\n"                                                  \
+    "stp q10, q11, [sp, #32]\n"                                                 \
+    "stp q12, q13, [sp, #64]\n"                                                 \
+    "stp q14, q15, [sp, #96]\n"                                                 \
+    "stp x19, x20, [sp, #128]\n"                                                \
+    "stp x21, x22, [sp, #144]\n"                                                \
+    "stp x23, x24, [sp, #160]\n"                                                \
+    "stp x25, x26, [sp, #176]\n"                                                \
+    "stp x27, x28, [sp, #192]\n"                                                \
+    "stp x29, x30, [sp, #208]\n"                                                \
+    "str x30, [sp, #224]\n"                                                     \
+    "str x0,  [sp, #232]\n"                                                     \
+    "mov x2, sp\n"                                                              \
+    "b coroutine__switch_context\n"
+#define RESTORE_REGISTERS                                                       \
+    "mov sp, x0\n"                                                              \
+    "ldp q8,   q9, [sp, #0]\n"                                                  \
+    "ldp q10, q11, [sp, #32]\n"                                                 \
+    "ldp q12, q13, [sp, #64]\n"                                                 \
+    "ldp q14, q15, [sp, #96]\n"                                                 \
+    "ldp x19, x20, [sp, #128]\n"                                                \
+    "ldp x21, x22, [sp, #144]\n"                                                \
+    "ldp x23, x24, [sp, #160]\n"                                                \
+    "ldp x25, x26, [sp, #176]\n"                                                \
+    "ldp x27, x28, [sp, #192]\n"                                                \
+    "ldp x29, x30, [sp, #208]\n"                                                \
+    "mov x1, x30\n"                                                             \
+    "ldr x30, [sp, #224]\n"                                                     \
+    "ldr x0,  [sp, #232]\n"                                                     \
+    "add sp, sp, #240\n"                                                        \
+    "ret x1\n"
+#else
+#error "Unsupported platform! Only supports x86_64 or Aarch64.
+#endif
+
+
 inline void __attribute__((naked)) coroutine_switch(__attribute__((unused)) int fd, __attribute__((unused)) CoroutineMode mode)
 {
     // @arch - Push the `arg` on the stack and then all callee-saved registers. Then jump to `coroutine__switch_context`.
-    __asm__(
-    "    pushq %rdi\n"
-    "    pushq %rbp\n"
-    "    pushq %rbx\n"
-    "    pushq %r12\n"
-    "    pushq %r13\n"
-    "    pushq %r14\n"
-    "    pushq %r15\n"
-    "    movq %rsp, %rdx\n"     // rsp
-    "    jmp coroutine__switch_context\n"
-    );
+    __asm__ volatile (STORE_REGISTERS);
 }
 
 static void __attribute__((naked)) coroutine__restore_context(__attribute__((unused)) void *rsp)
 {
     // @arch - Set the stack to `rsp`, restore all callee-saved registers and set the parameter in `rdi`.
-    __asm__(
-    "    movq %rdi, %rsp\n"     // Set stack pointer to the new stack
-    "    popq %r15\n"
-    "    popq %r14\n"
-    "    popq %r13\n"
-    "    popq %r12\n"
-    "    popq %rbx\n"
-    "    popq %rbp\n"
-    "    popq %rdi\n"
-    "    ret\n"
-    );
+    __asm__ volatile (RESTORE_REGISTERS);
 }
 
 
