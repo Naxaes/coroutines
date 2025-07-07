@@ -1,4 +1,6 @@
+#if defined(LOG)
 #define TCP_LOG(tid, cid, message, ...) printf("[%02d-%02d]: " message "\n", tid, cid, __VA_ARGS__)
+#endif
 #define TCP_IMPLEMENTATION
 #include "tcp.h"
 

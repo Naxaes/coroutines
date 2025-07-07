@@ -34,8 +34,10 @@ void coroutine_destroy_all(void);
 #endif
 
 
-#include <poll.h>
-#include <signal.h>
+#include <string.h>     // memcpy
+#include <errno.h>      // errno
+#include <stdio.h>      // perror
+#include <poll.h>       // poll
 
 #if !defined(COROUTINE_MAX_COUNT)
 #define COROUTINE_MAX_COUNT 1024
@@ -370,13 +372,15 @@ void coroutine_destroy_all(void) {
 #endif
 
 
-void __attribute__((naked)) coroutine_switch(__attribute__((unused)) int fd, __attribute__((unused)) CoroutineMode mode)
+__attribute__((naked))
+void coroutine_switch(__attribute__((unused)) int fd, __attribute__((unused)) CoroutineMode mode)
 {
     // @arch - Push the `arg` on the stack and then all callee-saved registers. Then jump to `coroutine__switch_context`.
     __asm__ volatile (STORE_REGISTERS);
 }
 
-static void __attribute__((naked)) coroutine__restore_context(__attribute__((unused)) void *rsp)
+__attribute__((naked))
+static void coroutine__restore_context(__attribute__((unused)) void *rsp)
 {
     // @arch - Set the stack to `rsp`, restore all callee-saved registers and set the parameter in `rdi`.
     __asm__ volatile (RESTORE_REGISTERS);
@@ -427,7 +431,7 @@ void coroutine__switch_context(int fd, CoroutineMode mode, void *rsp)
     Coroutine* coroutine = &g_coroutines[active_id];
     coroutine->stack_ptr = rsp;
 
-    COROUTINE_ASSERT(coroutine->stack_base == NULL || coroutine->stack_base <= coroutine->stack_ptr && coroutine->stack_ptr <= coroutine->stack_top);
+    COROUTINE_ASSERT(coroutine->stack_base == NULL || (coroutine->stack_base <= coroutine->stack_ptr && coroutine->stack_ptr <= coroutine->stack_top));
 
     switch (mode) {
         case CM_YIELD: {

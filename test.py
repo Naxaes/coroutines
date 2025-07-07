@@ -9,7 +9,7 @@ HEADER = """HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 119\r\
 
 def client_thread(host, port, i):
     try:
-        duration = random.randint(1, 5)
+        duration = random.random()
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((host, port))
         j = 0
@@ -35,6 +35,10 @@ def stress_test(host, port, num_clients):
     for thread in threads:
         thread.join()
 
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((host, port))
+    sock.sendall("shutdown".encode())
+    sock.close()
 
 stress_test(host = '127.0.0.1', port = 6969, num_clients = 1000)
 
