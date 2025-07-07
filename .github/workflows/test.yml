@@ -43,19 +43,18 @@ jobs:
 
       - name: Install packages (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y make gcc
+        run: sudo apt-get update && sudo apt-get install -y make clang
 
       - name: Install packages (macOS)
         if: runner.os == 'macOS'
-        run: |
-          brew install make || true
+        run: brew install make || true
 
-      - name: Build the example (Linux)
-        run: mkdir -p build && cc main.c -o build/main
+      - name: Build the example
+        run: make test
 
-      - name: Run example
+      - name: Run test
         run: |
-          ./build/main &
+          ./build/test &
           MAIN_PID=$!
           sleep 1
           python3 test.py || { kill $MAIN_PID; exit 1; }

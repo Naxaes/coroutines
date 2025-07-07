@@ -229,7 +229,6 @@ TcpServer tcp_server(const char* host, uint16_t port, uint16_t backlog) {
     g_main_thread = pthread_self();
     signal(SIGUSR1, tcp__shutdown_signal_handler);
 
-    int read_fds[TCP_THREAD_COUNT] = { 0 };
     int write_fds[TCP_THREAD_COUNT] = { 0 };
     pthread_t threads[TCP_THREAD_COUNT] = { 0 };
     result.thread_count = TCP__THREAD_COUNT;
@@ -240,7 +239,6 @@ TcpServer tcp_server(const char* host, uint16_t port, uint16_t backlog) {
         int read_fd  = pipe_fd[0];
         int write_fd = pipe_fd[1];
 
-        read_fds[i]  = read_fd;
         write_fds[i] = write_fd;
 
         pthread_t thread;

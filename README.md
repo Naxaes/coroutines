@@ -76,8 +76,8 @@ int main(void) {
 ### 3. Example: TCP server
 
 ```bash
-make main
-cd build && ./main
+make test
+cd build && ./test
 python3 test.py  # In another terminal
 ```
 
