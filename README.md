@@ -77,7 +77,7 @@ int main(void) {
 
 ```bash
 make test
-cd build && ./test
+./build/test
 python3 test.py  # In another terminal
 ```
 
