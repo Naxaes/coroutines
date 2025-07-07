@@ -111,7 +111,6 @@ static bool g_termination_signal_sent = false;
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
-#include <sys/sysctl.h>
 
 
 static void tcp__on_client_disconnected(void* stack, size_t size) {
@@ -169,14 +168,25 @@ terminate:
     coroutine_destroy_all();
     return NULL;
 }
-#endif
 
-
+#if defined(__APPLE__)
+#include <sys/sysctl.h>
 int tcp__num_cores(int number_on_error) {
     int num_cores;
     size_t size = sizeof(num_cores);
     return sysctlbyname("hw.logicalcpu", &num_cores, &size, NULL, 0) == 0 ? num_cores : number_on_error;
 }
+#else
+#include <unistd.h>
+int tcp__num_cores(int number_on_error) {
+    int ncpu = sysconf(_SC_NPROCESSORS_ONLN);
+    return ncpu;
+}
+#endif
+
+#endif
+
+
 
 
 

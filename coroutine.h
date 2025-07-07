@@ -370,7 +370,7 @@ void coroutine_destroy_all(void) {
 #endif
 
 
-inline void __attribute__((naked)) coroutine_switch(__attribute__((unused)) int fd, __attribute__((unused)) CoroutineMode mode)
+void __attribute__((naked)) coroutine_switch(__attribute__((unused)) int fd, __attribute__((unused)) CoroutineMode mode)
 {
     // @arch - Push the `arg` on the stack and then all callee-saved registers. Then jump to `coroutine__switch_context`.
     __asm__ volatile (STORE_REGISTERS);
