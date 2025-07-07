@@ -12,6 +12,7 @@ typedef enum CoroutineMode {
 int  coroutine_create(void (*f)(void*), const void* data, size_t size, void (*destroy)(void*, size_t));
 void coroutine_switch(int fd, CoroutineMode mode);
 int  coroutine_id(void);
+int  coroutine_active(void);
 void coroutine_wake_up(int id);
 void coroutine_destroy_all(void);
 
@@ -40,11 +41,11 @@ void coroutine_destroy_all(void);
 #define COROUTINE_MAX_COUNT 1024
 #endif
 
-#if !defined(COROUTINE_THREAD_COUNT)
-#define COROUTINE_THREAD_COUNT 8
+#if !defined(COROUTINE_IS_THREADED)
+#define COROUTINE_IS_THREADED 8
 #endif
 
-#if COROUTINE_THREAD_COUNT == 0
+#if !COROUTINE_IS_THREADED
 #define THREAD_LOCAL static
 #else
 #define THREAD_LOCAL _Thread_local
@@ -145,6 +146,10 @@ static void coroutine__return_from_current_coroutine(void);
 int coroutine_create(void (*f)(void*), const void* data, size_t size, void (*destroy)(void*, size_t))
 {
     COROUTINE_ASSERT(safety_check());
+
+    // NOTE: Rounding up size to a multiple of 16 as the stack is required to
+    //       be 16-byte aligned on certain architectures.
+    size = (size + 15) & ~(size_t)15;
 
     if (g_first_free != 0) {
         int free_index = g_first_free;
@@ -505,6 +510,11 @@ void coroutine_wake_up(int id) {
             return;
         }
     }
+}
+
+
+int coroutine_active(void) {
+    return g_active_count;
 }
 
 

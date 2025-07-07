@@ -100,7 +100,7 @@ static bool g_termination_signal_sent = false;
 #define COROUTINE_STACK_MMAP
 #endif
 
-#define COROUTINE_THREAD_COUNT TCP_THREAD_COUNT
+#define COROUTINE_IS_THREADED (TCP_THREAD_COUNT > 0)
 #define COROUTINE_LOG(id, message, ...) TCP_LOG(thread_id, id, message, __VA_ARGS__)
 #define COROUTINE_IMPLEMENTATION
 #include "coroutine.h"
