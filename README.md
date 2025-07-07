@@ -24,7 +24,7 @@ A high-performance, portable, stackful coroutine library for C, supporting `x86_
 #include "coroutine.h"
 ```
 
-### 2. Example: Cooperative Echo Server
+### 2. Example: Echo example
 
 ```c
 // ... include your libraries ...
@@ -71,6 +71,14 @@ int main(void) {
     coroutine_destroy_all();
     return 0;
 }
+```
+
+### 3. Example: TCP server
+
+```bash
+make main
+cd build && ./main
+python3 test.py  # In another terminal
 ```
 
 ---
@@ -120,5 +128,5 @@ Define these macros **before** including `coroutine.h` to customize behavior:
 ## Limitations/considerations
 
 * Only supported for *Linux* or *macOS* for **x86\_64** or **AArch64**.
-* It's stackful (since stackless requires language support) and therefore not as memory efficient, and context switches are slower.
-* SIMD registers are not saved currently
+* It's not as memory efficient as stackless coroutines (and it's stackful as stackless requires language support), and context switches are slower.
+* SIMD registers are currently not saved.
