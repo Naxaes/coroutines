@@ -89,7 +89,7 @@ void handle_client(TcpContext* ctx) {
             break;
         }
 
-        String index = load_html_file("../resources/index.html");
+        String index = load_html_file("./resources/index.html");
         if (index.data == NULL) {
             TCP_LOG(tid, cid, "Error loading index.html%s", "");
             return;
