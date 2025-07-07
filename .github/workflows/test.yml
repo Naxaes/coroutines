@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Test on ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        arch: [x86_64, aarch64]
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+            runner: ubuntu-latest
+          - os: ubuntu-latest
+            arch: aarch64
+            runner: ubuntu-latest
+          - os: macos-latest
+            arch: x86_64
+            runner: macos-latest
+          - os: macos-latest
+            arch: aarch64
+            runner: macos-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install packages (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y make gcc
+
+      - name: Install packages (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install make || true
+
+      - name: Build the example (Linux)
+        run: mkdir -p build && cc main.c -o build/main
+
+      - name: Run example
+        run: |
+          ./build/main &
+          MAIN_PID=$!
+          sleep 1
+          python3 test.py || { kill $MAIN_PID; exit 1; }
+          kill $MAIN_PID
