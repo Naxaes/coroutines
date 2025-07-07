@@ -269,7 +269,7 @@ int coroutine_create(void (*f)(void*), const void* data, size_t size, void (*des
         *(--ptr) = 0;   // push v08
         *(--ptr) = 0;
     #else
-    #error "Unsupported platform! Only supports x86_64 or Aarch64.
+    #error "Unsupported platform! Only supports x86_64 or Aarch64."
     #endif
 
 
@@ -366,7 +366,7 @@ void coroutine_destroy_all(void) {
     "add sp, sp, #240\n"                                                        \
     "ret x1\n"
 #else
-#error "Unsupported platform! Only supports x86_64 or Aarch64.
+#error "Unsupported platform! Only supports x86_64 or Aarch64."
 #endif
 
 
