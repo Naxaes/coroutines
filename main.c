@@ -1,3 +1,4 @@
+#define TCP_LOG(tid, cid, message, ...) printf("[%02d-%02d]: " message "\n", tid, cid, __VA_ARGS__)
 #define TCP_IMPLEMENTATION
 #include "tcp.h"
 
@@ -60,25 +61,24 @@ void handle_client(TcpContext* ctx) {
     char read_buffer[4096] = { 0 };
     char write_buffer[4096] = { 0 };
 
-    int id = coroutine_id();
+    int cid = coroutine_id();
+    int tid = thread_id;
 
     char client_address[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &(client->host), client_address, INET_ADDRSTRLEN);
-    printf("[%03d]: Client connected at %s:%d.\n", id, client_address, client->port);
+    inet_ntop(AF_INET, &client->host, client_address, INET_ADDRSTRLEN);
 
     while (true) {
-        printf("[%03d]: Waiting reading data from client!\n", id);
+        TCP_LOG(tid, cid, "Waiting reading data from client (%s:%d)!", client_address, client->port);
         ssize_t bytes_read = tcp_read(client, read_buffer, sizeof(read_buffer));
         if (bytes_read == 0) {
-            printf("[%03d]: Client disconnected.\n", id);
+            TCP_LOG(tid, cid, "Client (%s:%d) disconnected.", client_address, client->port);
             return;
         } else if (bytes_read < 0) {
-            printf("[%03d]: Error reading data from client. Exiting...\n", id);
+            TCP_LOG(tid, cid, "Error reading data from client (%s:%d). Exiting...", client_address, client->port);
             perror("handle_client");
             return;
         }
-        printf("[%03d]: Read %zd bytes from client\n", id, bytes_read);
-        printf("'%.*s'\n", (int)bytes_read, read_buffer);
+        TCP_LOG(tid, cid, "Read %zd bytes from client (%s:%d)\n'%.*s'\n", bytes_read, client_address, client->port, (int)bytes_read, read_buffer);
 
         if (strncmp(read_buffer, "exit", sizeof("exit")-1) == 0) {
             break;
@@ -89,7 +89,7 @@ void handle_client(TcpContext* ctx) {
 
         String index = load_html_file("../resources/index.html");
         if (index.data == NULL) {
-            printf("[%03d]: Error loading index.html\n", id);
+            TCP_LOG(tid, cid, "Error loading index.html%s", "");
             return;
         }
 
@@ -102,50 +102,53 @@ void handle_client(TcpContext* ctx) {
         memcpy(write_buffer+header_len, index.data, index.size);
         memcpy(write_buffer+header_len+index.size, read_buffer, bytes_read);
 
-        printf("[%03d]: Waiting writing data to client!\n", id);
+        TCP_LOG(tid, cid, "Waiting writing data to client (%s:%d)!", client_address, client->port);
         ssize_t bytes_written = tcp_write(client, write_buffer, header_len+index.size+bytes_read);
         free(index.data);
         if (bytes_written <= 0) {
-            printf("[%03d]: Couldn't write anything to client. Exiting...\n", id);
+            TCP_LOG(tid, cid, "Couldn't write anything to client (%s:%d). Exiting...", client_address, client->port);
             return;
         }
-        printf("[%03d]: Wrote %lu bytes to client\n", id, index.size+bytes_read);
+        TCP_LOG(tid, cid, "Wrote %lu bytes to client (%s:%d)", index.size+bytes_read, client_address, client->port);
     }
 
-    printf("[%03d]: Client disconnected!\n", id);
+    TCP_LOG(tid, cid, "Client (%s:%d) disconnected!", client_address, client->port);
 }
 
 
-int main()
+
+int main(void)
 {
     const char* error = NULL;
 
     TcpServer server = tcp_server(NULL, 6969, 0);
     if ((error = tcp_server_error(server))) {
-        fprintf(stderr, "%s\n", error);
+        TCP_LOG(0, 0, "%s\n", error);
         return EXIT_FAILURE;
     }
 
     char ip_str[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &(server.host), ip_str, INET_ADDRSTRLEN);
-    printf("Serving at %s:%d\n", ip_str, server.port);
+    TCP_LOG(0, 0, "Serving at %s:%d", ip_str, server.port);
 
     while (true) {
-        printf("[000]: Waiting for client connection...\n");
+        TCP_LOG(0, 0, "Waiting for client connection...%s", "");
         TcpClient client = tcp_accept(&server, handle_client);
-        if ((error = tcp_client_error(client))) {
-            fprintf(stderr, "%s\n", error);
-        } else {
-            char client_address[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, &client.host, client_address, INET_ADDRSTRLEN);
+        switch (tcp_client_status(client)) {
+            case TCP_CLIENT_ERROR: {
+                TCP_LOG(0, 0, "%s\n", tcp_client_error(client));
+                break;
+            } case TCP_CLIENT_REQUESTED_SHUTDOWN: {
+                TCP_LOG(0, 0, "Shutting down the server!%s", "");
+                tcp_close(&server);
+                return EXIT_SUCCESS;
+            } case TCP_CLIENT_CONNECTED: {
+                char client_address[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &client.host, client_address, INET_ADDRSTRLEN);
 
-            printf("[000]: Client %d connected at %s:%d.\n", client.fd, client_address, client.port);
-        }
-
-        if (tcp_shutdown_requested()) {
-            printf("[000]: Shutting down the server!\n");
-            tcp_close(&server);
-            return EXIT_SUCCESS;
+                TCP_LOG(0, 0, "Client %d connected at %s:%d", client.fd, client_address, client.port);
+                break;
+            }
         }
     }
 }
