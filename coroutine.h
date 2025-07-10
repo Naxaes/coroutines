@@ -279,7 +279,7 @@ int coroutine_create(void (*f)(void*), const void* data, size_t size, void (*on_
         .stack_base = stack,
         .stack_ptr = ptr,
         .stack_top = stack_top,
-        .destroy = destroy,
+        .destroy = on_destroy,
     };
 
     g_active[g_active_count++] = g_coroutine_count;
