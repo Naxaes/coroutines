@@ -9,7 +9,7 @@ typedef enum CoroutineMode {
     CM_WAIT_WRITE,
 } CoroutineMode;
 
-int  coroutine_create(void (*f)(void*), const void* data, size_t size, void (*destroy)(void*, size_t));
+int  coroutine_create(void (*f)(void*), const void* data, size_t size, void (*on_destroy)(void*, size_t));
 void coroutine_switch(int fd, CoroutineMode mode);
 int  coroutine_id(void);
 int  coroutine_active(void);
@@ -44,7 +44,7 @@ void coroutine_destroy_all(void);
 #endif
 
 #if !defined(COROUTINE_IS_THREADED)
-#define COROUTINE_IS_THREADED 8
+#define COROUTINE_IS_THREADED 0
 #endif
 
 #if !COROUTINE_IS_THREADED
@@ -145,7 +145,7 @@ static int safety_check(void) {
 
 
 static void coroutine__return_from_current_coroutine(void);
-int coroutine_create(void (*f)(void*), const void* data, size_t size, void (*destroy)(void*, size_t))
+int coroutine_create(void (*f)(void*), const void* data, size_t size, void (*on_destroy)(void*, size_t))
 {
     COROUTINE_ASSERT(safety_check());
 
@@ -158,7 +158,7 @@ int coroutine_create(void (*f)(void*), const void* data, size_t size, void (*des
         Coroutine* free = &g_coroutines[free_index];
         g_active[g_active_count++] = free_index;
         g_first_free = free->next_free;
-        free->destroy = destroy;
+        free->destroy = on_destroy;
 
         char* stack_top = (char*)free->stack_top;
         char* ptr_top   = (char*)stack_top - size;
@@ -487,6 +487,8 @@ static void coroutine__return_from_current_coroutine(void)
 
     if (g_active_count == 0) {
         coroutine__poll();
+    } else if (g_current_active == g_active_count) {
+        g_current_active = 0;
     }
 
     int next_active_id = g_active[g_current_active];

@@ -27,49 +27,38 @@ A high-performance, portable, stackful coroutine library for C, supporting `x86_
 ### 2. Example: Echo example
 
 ```c
-// ... include your libraries ...
+#include <stdio.h>
 
-#define COROUTINE_STACK_MMAP
-#define COROUTINE_MAX_COUNT 12      // Define max amount of concurrent coroutines
-#define COROUTINE_IMPLEMENTATION    // Include the implementation
+#define COROUTINE_STACK_SIZE (4096)
+#define COROUTINE_STACK_MALLOC
+#define COROUTINE_IMPLEMENTATION
 #include "coroutine.h"
 
 
-void echo(void* arg) {
-    int fd = (int)(size_t)arg;
-    char buffer[128];
+void my_task(void* arg) {
+    int n = *(int*)arg;
 
-    // Wait for the file descriptor to be ready to read.
-    coroutine_wait_read(fd);
-    
-    // This should always be ready.
-    ssize_t n = read(fd, buffer, sizeof(buffer));
-    if (n <= 0) break;
-
-    coroutine_wait_write(fd);
-    write(fd, buffer, n);
-
-    close(fd);
+    printf("Starting coroutine %d for %d iterations\n", coroutine_id(), n);
+    for (int i = 0; i < n; i++) {
+        printf("Coroutine %d on iteration %d\n", coroutine_id(), i);
+        coroutine_yield();
+    }
 }
 
 
-int main(void) {
-    // Create a non-blocking file descriptor to a socket or file.
-    int fd = ...;
-    
-    // Dispatch a coroutine (won't start it)
-    coroutine_create(echo, (void*)fd, sizeof(fd), NULL);
+int main() {
+    int n;
+
+    n = 20; coroutine_create(my_task, &n, sizeof(n), NULL);
+    n = 10; coroutine_create(my_task, &n, sizeof(n), NULL);
+    n = 15; coroutine_create(my_task, &n, sizeof(n), NULL);
 
     while (coroutine_active() > 1) {
-        printf("Yielding...\n");
+        printf("Main is yielding...\n");
         coroutine_yield();  // Start the coroutine
     }
-    
-    printf("Done!");
 
-    // Deallocate all coroutines and their stacks.
-    coroutine_destroy_all();
-    return 0;
+    printf("Done\n");
 }
 ```
 
@@ -87,10 +76,10 @@ python3 test.py  # In another terminal
 
 ```c
 int coroutine_create(
-    void (*f)(void*),               // Entry function
-    const void* data,               // Argument data (copied to the beginning of the coroutine stack)
-    size_t size,                    // Size of argument
-    void (*destroy)(void*, size_t)  // Optional destructor for stack/argument
+    void (*f)(void*),                   // Entry function
+    const void* data,                   // Argument data (copied to the beginning of the coroutine stack)
+    size_t size,                        // Size of argument
+    void (*on_destroy)(void*, size_t)   // Optional destructor for stack/argument
 );
 
 int  coroutine_id(void);                           // Current coroutine ID
@@ -130,3 +119,4 @@ Define these macros **before** including `coroutine.h` to customize behavior:
 * Only supported for *Linux* or *macOS* for **x86\_64** or **AArch64**.
 * It's not as memory efficient as stackless coroutines (and it's stackful as stackless requires language support), and context switches are slower.
 * SIMD registers are currently not saved.
+* Only working with clang as GCC doesn't support naked functions.
